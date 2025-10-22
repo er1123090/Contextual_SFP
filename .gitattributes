@@ -1,3 +1,6 @@
+*.jsonl filter=lfs diff=lfs merge=lfs -text
+*.csv filter=lfs diff=lfs merge=lfs -text
+*.git filter=lfs diff=lfs merge=lfs -text
 data/PersonaMem/shared_contexts_*.jsonl filter=lfs diff=lfs merge=lfs -text
 data/PersonaMem/questions_*.csv filter=lfs diff=lfs merge=lfs -text
 data/ALOE/*.jsonl filter=lfs diff=lfs merge=lfs -text
