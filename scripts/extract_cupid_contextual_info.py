@@ -25,89 +25,26 @@ import sys
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Union
-
-try:
-    import pandas as pd
-except ImportError as exc:  # pragma: no cover - handled at runtime
-    raise SystemExit(
-        "pandas is required to run this script. Install it with `pip install pandas pyarrow`."
-    ) from exc
-
-try:
-    from openai import OpenAI
-except ImportError as exc:  # pragma: no cover - handled at runtime
-    raise SystemExit(
-        "The `openai` package is required. Install it with `pip install openai`."
-    ) from exc
+import pandas as pd
+from openai import OpenAI
 
 
 LOGGER = logging.getLogger(__name__)
 
 _DEFAULT_MODEL = "gpt-4o-mini"
-_SYSTEM_PROMPT = (
+_SYSTEM_PROMPT = ("""
     "You are an expert analyst who extracts structured contextual information from "
     "dialogues. Each prior interaction contains exactly one contextual factor and one "
     "contextual preference. Identify the real-world situation being discussed, the "
-    "contextual factor, and the contextual preference. Provide concise paraphrases "
+    "contextual factor, and the contextual preference. "
+    "Contextual Situation (S): The overall spatiotemporal and social context in which the utterance occurs"
+    "Contextual Factor (F): The specific object or attribute that directly influences the preference"
+    "Preference (P): The expressed preference or attitude"
+    "Provide concise paraphrases "
     "grounded in the supplied dialogue."
-)
-_RESPONSE_SCHEMA: Dict[str, Any] = {
-    "type": "json_schema",
-    "json_schema": {
-        "name": "contextual_extraction",
-        "schema": {
-            "type": "object",
-            "additionalProperties": False,
-            "required": ["sessions"],
-            "properties": {
-                "sessions": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "required": [
-                            "contextual_situation",
-                            "contextual_factor",
-                            "contextual_preference",
-                        ],
-                        "properties": {
-                            "contextual_situation": {
-                                "type": "string",
-                                "description": (
-                                    "A short description of the real-world situation or scenario "
-                                    "derived from the dialogue."
-                                ),
-                            },
-                            "contextual_factor": {
-                                "type": "string",
-                                "description": (
-                                    "The contextual factor explicitly mentioned in the dialogue "
-                                    "(e.g., location, timing, participants)."
-                                ),
-                            },
-                            "contextual_preference": {
-                                "type": "string",
-                                "description": (
-                                    "The participant preference or requirement linked to the "
-                                    "contextual factor."
-                                ),
-                            },
-                            "supporting_dialogue": {
-                                "type": ["string", "null"],
-                                "description": (
-                                    "Direct quote or concise snippet from the dialogue that "
-                                    "justifies the extraction."
-                                ),
-                                "default": None,
-                            },
-                        },
-                    },
-                }
-            },
-        },
-    },
-}
 
+""")
+        
 
 @dataclass
 class ExtractionConfig:
@@ -202,13 +139,61 @@ def _extract_with_retries(
     if not prompt_text.strip():
         return {"sessions": []}
 
-    user_instructions = (
-        "You are given the `prior_interactions` content for a persona. "
+    user_instructions = ("""
+        "You are given the `interaction session` content for a persona. "
         "Each entry corresponds to a single session containing one contextual "
         "factor and one contextual preference. Identify each session and capture "
         "the contextual situation, factor, and preference. Return the results as "
         "JSON matching the provided schema."
-    )
+                         
+        "For example  "
+
+        "Contextual Situation (S): The overall spatiotemporal and social context in which the utterance occurs"
+        "Contextual Factor (F): The specific object or attribute that directly influences the preference"
+        "Preference (P): The expressed preference or attitude"
+        "Utterance: “I’ve been drinking less coffee lately.”"
+        "Expected Output:"
+        "S: Recent time period (temporal context)"
+        "F: Coffee (beverage entity)"
+        "P: reduced consumption"
+
+        "Provide concise paraphrases "
+        "grounded in the supplied dialogue."
+
+        "[output format]"
+                        "properties": {
+                            "contextual_situation": {
+                                "type": "string",
+                                "description": (
+                                    "A short description of the real-world situation or scenario "
+                                    "derived from the dialogue."
+                                ),
+                            },
+                            "contextual_factor": {
+                                "type": "string",
+                                "description": (
+                                    "The contextual factor explicitly mentioned in the dialogue "
+                                    "(e.g., location, timing, participants)."
+                                ),
+                            },
+                            "contextual_preference": {
+                                "type": "string",
+                                "description": (
+                                    "The participant preference or requirement linked to the "
+                                    "contextual factor."
+                                ),
+                            },
+                            "supporting_dialogue": {
+                                "type": ["string", "null"],
+                                "description": (
+                                    "Direct quote or concise snippet from the dialogue that "
+                                    "justifies the extraction."
+                                ),
+                                "default": None,
+                            },
+                        }
+
+    """)
 
     for attempt in range(1, config.max_retries + 1):
         try:
@@ -226,8 +211,7 @@ def _extract_with_retries(
                             },
                         ],
                     },
-                ],
-                response_format=_RESPONSE_SCHEMA,
+                ]
             )
 
             # The Responses API exposes the structured content in ``output_text``.
