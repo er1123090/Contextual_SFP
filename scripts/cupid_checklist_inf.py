@@ -39,7 +39,7 @@ class EvaluationConfig:
 def load_json_dataset(path: str) -> List[Dict[str, Any]]:
     """Load the CUPID dataset from ``path``."""
 
-    with open(path, "r", encoding="utf-8") as fh:
+    with open("/data/minseo/Contextual_SFP_extract/data/CUPID/test.json", "r", encoding="utf-8") as fh:
         return json.load(fh)
 
 
